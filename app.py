@@ -1,3 +1,34 @@
+import hmac
+import hashlib
+import time
+import streamlit as st
+
+SECRET = "2ANGh8hrSewqCP9TDj465pht" # Your Razorpay Secret
+
+if "authorized" not in st.session_state:
+    query_params = st.query_params
+    t = query_params.get("t")
+    sig = query_params.get("sig")
+
+    if not t or not sig:
+        st.error("🔒 Access Denied. Please launch this tool securely from psjajodia.com")
+        st.stop()
+
+    # Verify mathematical signature
+    expected_sig = hmac.new(SECRET.encode(), t.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, sig):
+        st.error("⛔ Invalid Security Token.")
+        st.stop()
+
+    # Self-destruct logic (Link expires 60 seconds after generation)
+    if int(time.time() * 1000) - int(t) > 60000:
+        st.error("⏱️ Link Expired! Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
+        st.stop()
+
+    # If all checks pass, mark browser as authorized for this session
+    st.session_state.authorized = True
+
+
 import io
 import re
 from collections import defaultdict
