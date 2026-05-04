@@ -1,34 +1,3 @@
-import hmac
-import hashlib
-import time
-import streamlit as st
-
-SECRET = "2ANGh8hrSewqCP9TDj465pht" # Your Razorpay Secret
-
-if "authorized" not in st.session_state:
-    query_params = st.query_params
-    t = query_params.get("t")
-    sig = query_params.get("sig")
-
-    if not t or not sig:
-        st.error("🔒 Access Denied. Please launch this tool securely from psjajodia.com")
-        st.stop()
-
-    # Verify mathematical signature
-    expected_sig = hmac.new(SECRET.encode(), t.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected_sig, sig):
-        st.error("⛔ Invalid Security Token.")
-        st.stop()
-
-    # Self-destruct logic (Link expires 60 seconds after generation)
-    if int(time.time() * 1000) - int(t) > 60000:
-        st.error("⏱️ Link Expired! Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
-        st.stop()
-
-    # If all checks pass, mark browser as authorized for this session
-    st.session_state.authorized = True
-
-
 import io
 import re
 import hmac
@@ -41,30 +10,29 @@ import pandas as pd
 import streamlit as st
 
 # ─── SECURITY CHECK ────────────────────────────────────────────────────────────
-def check_access():
+# We only want to verify the URL parameters once per session
+if "authorized" not in st.session_state:
     params = st.query_params
     t = params.get("t")
     sig = params.get("sig")
     email = params.get("email")
 
-    if not t or not sig or not email:
-        st.error("⛔ Access Denied: Missing security token.")
-        st.write("Please launch this tool directly from your purchased tools dashboard on psjajodia.com.")
+    if not t or not sig:
+        st.error("🔒 Access Denied: Missing security token.")
+        st.write("Please launch this tool directly from your purchased tools dashboard on **psjajodia.com**.")
         st.stop()
         
     try:
-        # Check if URL has expired (e.g., 60 seconds lifetime)
+        # Check if URL has expired (15 minutes lifetime to allow for Streamlit app wake-up time)
         url_time = int(t)
-        if time.time() * 1000 - url_time > 60000:
+        if time.time() * 1000 - url_time > 900000:
             st.error("⏳ Access Denied: The launch link has expired.")
             st.write("Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
             st.stop()
             
         # Verify cryptographic signature
-        secret = st.secrets.get("RAZORPAY_KEY_SECRET")
-        if not secret:
-            st.error("⚠️ System Configuration Error: Streamlit Secrets are missing RAZORPAY_KEY_SECRET.")
-            st.stop()
+        # Check Streamlit secrets first, fallback to hardcoded if not set yet (for transition)
+        secret = st.secrets.get("RAZORPAY_KEY_SECRET", "2ANGh8hrSewqCP9TDj465pht")
             
         expected_sig = hmac.new(
             secret.encode('utf-8'),
@@ -72,15 +40,17 @@ def check_access():
             hashlib.sha256
         ).hexdigest()
         
-        if sig != expected_sig:
+        if not hmac.compare_digest(expected_sig, sig):
             st.error("⛔ Access Denied: Invalid security signature.")
+            st.write("Please ensure you are launching from psjajodia.com.")
             st.stop()
             
+        # If all checks pass, mark browser as authorized for this session
+        st.session_state.authorized = True
+        
     except Exception as e:
         st.error(f"⛔ Access Denied: Security validation failed.")
         st.stop()
-
-check_access()
 # ───────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_COLUMNS_26AS = [
