@@ -31,11 +31,57 @@ if "authorized" not in st.session_state:
 
 import io
 import re
+import hmac
+import hashlib
+import time
 from collections import defaultdict
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+
+# ─── SECURITY CHECK ────────────────────────────────────────────────────────────
+def check_access():
+    params = st.query_params
+    t = params.get("t")
+    sig = params.get("sig")
+    email = params.get("email")
+
+    if not t or not sig or not email:
+        st.error("⛔ Access Denied: Missing security token.")
+        st.write("Please launch this tool directly from your purchased tools dashboard on psjajodia.com.")
+        st.stop()
+        
+    try:
+        # Check if URL has expired (e.g., 60 seconds lifetime)
+        url_time = int(t)
+        if time.time() * 1000 - url_time > 60000:
+            st.error("⏳ Access Denied: The launch link has expired.")
+            st.write("Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
+            st.stop()
+            
+        # Verify cryptographic signature
+        secret = st.secrets.get("RAZORPAY_KEY_SECRET")
+        if not secret:
+            st.error("⚠️ System Configuration Error: Streamlit Secrets are missing RAZORPAY_KEY_SECRET.")
+            st.stop()
+            
+        expected_sig = hmac.new(
+            secret.encode('utf-8'),
+            str(t).encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if sig != expected_sig:
+            st.error("⛔ Access Denied: Invalid security signature.")
+            st.stop()
+            
+    except Exception as e:
+        st.error(f"⛔ Access Denied: Security validation failed.")
+        st.stop()
+
+check_access()
+# ───────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_COLUMNS_26AS = [
     "Sr No.",
