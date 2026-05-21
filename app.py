@@ -9,49 +9,8 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-# ─── SECURITY CHECK ────────────────────────────────────────────────────────────
-# We only want to verify the URL parameters once per session
-if "authorized" not in st.session_state:
-    params = st.query_params
-    t = params.get("t")
-    sig = params.get("sig")
-    email = params.get("email")
+# Security check disabled because tool is now free
 
-    if not t or not sig:
-        st.error("🔒 Access Denied: Missing security token.")
-        st.write("Please launch this tool directly from your purchased tools dashboard on **psjajodia.com**.")
-        st.stop()
-        
-    try:
-        # Check if URL has expired (15 minutes lifetime to allow for Streamlit app wake-up time)
-        url_time = int(t)
-        if time.time() * 1000 - url_time > 900000:
-            st.error("⏳ Access Denied: The launch link has expired.")
-            st.write("Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
-            st.stop()
-            
-        # Verify cryptographic signature
-        # Check Streamlit secrets first, fallback to hardcoded if not set yet (for transition)
-        secret = st.secrets.get("RAZORPAY_KEY_SECRET", "2ANGh8hrSewqCP9TDj465pht")
-            
-        expected_sig = hmac.new(
-            secret.encode('utf-8'),
-            str(t).encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(expected_sig, sig):
-            st.error("⛔ Access Denied: Invalid security signature.")
-            st.write("Please ensure you are launching from psjajodia.com.")
-            st.stop()
-            
-        # If all checks pass, mark browser as authorized for this session
-        st.session_state.authorized = True
-        
-    except Exception as e:
-        st.error(f"⛔ Access Denied: Security validation failed.")
-        st.stop()
-# ───────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_COLUMNS_26AS = [
     "Sr No.",
