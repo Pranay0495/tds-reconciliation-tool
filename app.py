@@ -10,64 +10,48 @@ import pandas as pd
 import streamlit as st
 import requests
 
-# ─── DYNAMIC SECURITY CHECK ───────────────────────────────────────────────────
-# Check if the tool is currently paid or free on the live website
+# ─── SECURITY CHECK ───────────────────────────────────────────────────────────
+# We ALWAYS require query parameters t and sig, regardless of whether the tool is paid or free,
+# to ensure the base link without token parameters can never be bookmarked or reused.
 if "authorized" not in st.session_state:
-    is_paid = True  # Default to paid for maximum security
+    params = st.query_params
+    t = params.get("t")
+    sig = params.get("sig")
+    email = params.get("email")
+
+    if not t or not sig:
+        st.error("🔒 Access Denied: Missing security token.")
+        st.write("Please launch this tool directly from **psjajodia.com**.")
+        st.stop()
+        
     try:
-        # Query psjajodia.com API to get the latest payment status of this tool
-        api_url = "https://psjajodia.com/api/tools/tds-reconciliation-tool"
-        res = requests.get(api_url, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("success"):
-                is_paid = data.get("tool", {}).get("isPaid", True)
-    except Exception as e:
-        # If the API is unreachable, we stick to is_paid = True as a secure default
-        pass
-
-    if is_paid:
-        params = st.query_params
-        t = params.get("t")
-        sig = params.get("sig")
-        email = params.get("email")
-
-        if not t or not sig:
-            st.error("🔒 Access Denied: Missing security token.")
-            st.write("Please launch this tool directly from your purchased tools dashboard on **psjajodia.com**.")
+        # Check if URL has expired (15 minutes lifetime to allow for Streamlit app wake-up time)
+        url_time = int(t)
+        if time.time() * 1000 - url_time > 900000:
+            st.error("⏳ Access Denied: The launch link has expired.")
+            st.write("Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
             st.stop()
             
-        try:
-            # Check if URL has expired (15 minutes lifetime to allow for Streamlit app wake-up time)
-            url_time = int(t)
-            if time.time() * 1000 - url_time > 900000:
-                st.error("⏳ Access Denied: The launch link has expired.")
-                st.write("Please go back to psjajodia.com and click 'Launch Secure Tool' again.")
-                st.stop()
-                
-            # Verify cryptographic signature
-            secret = st.secrets.get("RAZORPAY_KEY_SECRET", "2ANGh8hrSewqCP9TDj465pht")
-                
-            expected_sig = hmac.new(
-                secret.encode('utf-8'),
-                str(t).encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
+        # Verify cryptographic signature
+        secret = st.secrets.get("RAZORPAY_KEY_SECRET", "2ANGh8hrSewqCP9TDj465pht")
             
-            if not hmac.compare_digest(expected_sig, sig):
-                st.error("⛔ Access Denied: Invalid security signature.")
-                st.write("Please ensure you are launching from psjajodia.com.")
-                st.stop()
-                
-            # If all checks pass, mark browser as authorized for this session
-            st.session_state.authorized = True
-            
-        except Exception as e:
-            st.error(f"⛔ Access Denied: Security validation failed.")
+        expected_sig = hmac.new(
+            secret.encode('utf-8'),
+            str(t).encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(expected_sig, sig):
+            st.error("⛔ Access Denied: Invalid security signature.")
+            st.write("Please ensure you are launching from psjajodia.com.")
             st.stop()
-    else:
-        # Tool is free, so anyone gets authorized automatically
+            
+        # If all checks pass, mark browser as authorized for this session
         st.session_state.authorized = True
+        
+    except Exception as e:
+        st.error(f"⛔ Access Denied: Security validation failed.")
+        st.stop()
 # ───────────────────────────────────────────────────────────────────────────────
 
 OUTPUT_COLUMNS_26AS = [
